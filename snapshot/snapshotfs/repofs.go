@@ -60,6 +60,10 @@ func (e *repositoryEntry) ModTime() time.Time {
 	return e.metadata.ModTime.ToTime()
 }
 
+func (e *repositoryEntry) BirthTime() time.Time {
+	return e.metadata.BirthTime.ToTime()
+}
+
 func (e *repositoryEntry) ObjectID() object.ID {
 	return e.metadata.ObjectID
 }
