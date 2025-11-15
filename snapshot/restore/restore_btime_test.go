@@ -77,7 +77,8 @@ func TestBirthTimeSnapshotAndRestore(t *testing.T) {
 	t.Logf("Second snapshot created (new repo, with btime)")
 
 	// Restore
-	root := snapshotfs.DirectoryEntry(env.RepositoryWriter, latestSnapshot.RootEntry.ObjectID, latestSnapshot.RootEntry.DirSummary)
+	root, err := snapshotfs.SnapshotRoot(env.RepositoryWriter, latestSnapshot)
+	require.NoError(t, err)
 	output := restore.FilesystemOutput{
 		TargetPath:             restoreDir,
 		OverwriteDirectories:   true,
@@ -96,6 +97,10 @@ func TestBirthTimeSnapshotAndRestore(t *testing.T) {
 	require.NoError(t, err)
 	restoredBtime := getBirthTime(restoredEntry)
 	restoredMtime := restoredEntry.ModTime()
+	
+	restoredDirEntry, err := localfs.NewEntry(restoreDir)
+	require.NoError(t, err)
+	restoredDirBtime := getBirthTime(restoredDirEntry)
 
 	t.Logf("Restored - btime: %v, mtime: %v", restoredBtime, restoredMtime)
 
@@ -104,11 +109,14 @@ func TestBirthTimeSnapshotAndRestore(t *testing.T) {
 
 	if canRestoreBirthTime {
 		// On Windows/macOS, birth time should be preserved
-		require.Equal(t, originalBtime, restoredBtime, "birth time should match on "+runtime.GOOS)
+		require.Equal(t, originalBtime, restoredBtime, "file birth time should match on "+runtime.GOOS)
+		require.Equal(t, originalBtime, restoredDirBtime, "directory birth time should match on "+runtime.GOOS)
 
 	} else {
-		require.Equal(t, sourceMtime, restoredBtime, "birth time should match mtime on "+runtime.GOOS)
+		require.Equal(t, sourceMtime, restoredBtime, "file birth time should match mtime on "+runtime.GOOS)
+		require.Equal(t, sourceMtime, restoredBtime, "directory birth time should match mtime on "+runtime.GOOS)
 	}
+
 }
 
 func getBirthTime(entry fs.Entry) time.Time {
