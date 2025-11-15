@@ -2,6 +2,7 @@ package restore
 
 import (
 	"os"
+	"syscall"
 	"time"
 	"unsafe"
 
@@ -72,25 +73,17 @@ type attrlist struct {
 	forkattr    uint32
 }
 
-type attrbuf struct {
-	length uint32
-	crtime unix.Timespec
-}
-
 func setBirthTime(path string, btime time.Time) error {
-	// Prepare the attribute list to specify we're setting creation time
 	attrs := attrlist{
 		bitmapcount: ATTR_BIT_MAP_COUNT,
 		commonattr:  ATTR_CMN_CRTIME,
 	}
 
-	// Prepare the attribute buffer with the new creation time
-	buf := attrbuf{
-		length: uint32(unsafe.Sizeof(attrbuf{})),
-		crtime: unix.NsecToTimespec(btime.UnixNano()),
+	crtime := syscall.Timespec{
+		Sec:  btime.Unix(),
+		Nsec: int64(btime.Nanosecond()),
 	}
 
-	// Call setattrlist
 	pathPtr, err := unix.BytePtrFromString(path)
 	if err != nil {
 		return errors.Wrap(err, "unable to convert path to C string")
@@ -100,8 +93,8 @@ func setBirthTime(path string, btime time.Time) error {
 		unix.SYS_SETATTRLIST,
 		uintptr(unsafe.Pointer(pathPtr)),
 		uintptr(unsafe.Pointer(&attrs)),
-		uintptr(unsafe.Pointer(&buf)),
-		unsafe.Sizeof(buf),
+		uintptr(unsafe.Pointer(&crtime)),
+		unsafe.Sizeof(crtime),
 		0, // options
 		0,
 	)

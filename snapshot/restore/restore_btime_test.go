@@ -28,6 +28,11 @@ func TestBirthTimeSnapshotAndRestore(t *testing.T) {
 
 	canRestoreBirthTime := runtime.GOOS == "windows" || runtime.GOOS == "darwin"
 
+	// Get source directory's original birthtime
+	sourceDirEntry, err := localfs.NewEntry(sourceDir)
+	require.NoError(t, err)
+	originalDirBtime := getBirthTime(sourceDirEntry)
+
 	// Create dummy file
 	dummyFile := filepath.Join(sourceDir, "dummy.txt")
 	require.NoError(t, os.WriteFile(dummyFile, []byte("test"), 0o644))
@@ -42,7 +47,8 @@ func TestBirthTimeSnapshotAndRestore(t *testing.T) {
 	originalBtime := getBirthTime(sourceEntry)
 	sourceMtime := sourceEntry.ModTime()
 
-	t.Logf("Original - btime: %v, mtime: %v", originalBtime, sourceMtime)
+	t.Logf("Original - file btime: %v, mtime: %v", originalBtime, sourceMtime)
+	t.Logf("Original - dir btime: %v", originalDirBtime)
 
 	// Simulate old repo without btime: set btime to zero (simulating no btime info)
 	if canRestoreBirthTime {
@@ -110,7 +116,7 @@ func TestBirthTimeSnapshotAndRestore(t *testing.T) {
 	if canRestoreBirthTime {
 		// On Windows/macOS, birth time should be preserved
 		require.Equal(t, originalBtime, restoredBtime, "file birth time should match on "+runtime.GOOS)
-		require.Equal(t, originalBtime, restoredDirBtime, "directory birth time should match on "+runtime.GOOS)
+		require.Equal(t, originalDirBtime, restoredDirBtime, "directory birth time should match on "+runtime.GOOS)
 
 	} else {
 		require.Equal(t, sourceMtime, restoredBtime, "file birth time should match mtime on "+runtime.GOOS)
