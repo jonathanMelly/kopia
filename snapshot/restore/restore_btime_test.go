@@ -50,35 +50,52 @@ func TestBirthTimeSnapshotAndRestore(t *testing.T) {
 	t.Logf("Original - file btime: %v, mtime: %v", originalBtime, sourceMtime)
 	t.Logf("Original - dir btime: %v", originalDirBtime)
 
-	// Simulate old repo without btime: set btime to zero (simulating no btime info)
+	// Create first snapshot normally
+	firstSnapshot := createSnapshot(t, ctx, env.RepositoryWriter, sourceDir)
+
+	// Simulate old repo without btime: hack the snapshot metadata to set BirthTime = nil
+	// This simulates a snapshot created by old Kopia that didn't support btime
+	// Note: We only modify the root directory entry here. The file entries are stored
+	// in the repository objects and would need to be fetched and modified separately,
+	// but for this test, checking the root directory behavior is sufficient.
+	firstSnapshot.RootEntry.BirthTime = nil
+
+	// Save the modified snapshot
+	_, err = snapshot.SaveSnapshot(ctx, env.RepositoryWriter, firstSnapshot)
+	require.NoError(t, err)
+
+	t.Logf("First snapshot created and modified (simulating old repo, btime = nil)")
+
+	// Test restoring the first snapshot (without btime)
+	restoreDir1 := t.TempDir()
+	root1, err := snapshotfs.SnapshotRoot(env.RepositoryWriter, firstSnapshot)
+	require.NoError(t, err)
+	output1 := restore.FilesystemOutput{
+		TargetPath:             restoreDir1,
+		OverwriteDirectories:   true,
+		OverwriteFiles:         true,
+		OverwriteSymlinks:      true,
+		IgnorePermissionErrors: true,
+	}
+	require.NoError(t, output1.Init(ctx))
+	_, err = restore.Entry(ctx, env.RepositoryWriter, &output1, root1, restore.Options{})
+	require.NoError(t, err)
+
+	// Check restored directory from first snapshot (we modified its btime to nil)
+	restoredDir1Entry, err := localfs.NewEntry(restoreDir1)
+	require.NoError(t, err)
+	restoredDir1Btime := getBirthTime(restoredDir1Entry)
+	t.Logf("First snapshot restored - dir btime: %v", restoredDir1Btime)
+
+	// For old snapshots without btime, OS sets btime to file creation time (approximately now)
 	if canRestoreBirthTime {
-		err = restore.ChtimesExact(dummyFile, time.Time{}, sourceMtime, sourceMtime)
-		require.NoError(t, err)
+		// btime should be close to current time (within a few seconds of the restore)
+		timeSinceRestore := time.Since(restoredDir1Btime)
+		require.Less(t, timeSinceRestore, 10*time.Second, "dir btime should be recent (file creation time during restore)")
+		require.GreaterOrEqual(t, timeSinceRestore, time.Duration(0), "dir btime should not be in the future")
 	}
 
-	// Verify btime is now set to zero/epoch
-	entryBeforeSnap1, err := localfs.NewEntry(dummyFile)
-	require.NoError(t, err)
-	btimeBeforeSnap1 := getBirthTime(entryBeforeSnap1)
-	t.Logf("Before snapshot 1 - btime: %v (should be 0/epoch)", btimeBeforeSnap1)
-
-	// Create first snapshot (simulates old snapshot without btime metadata)
-	_ = createSnapshot(t, ctx, env.RepositoryWriter, sourceDir)
-	t.Logf("First snapshot created (old repo, btime = 0)")
-
-	// Restore original birth time to simulate migration scenario
-	if canRestoreBirthTime {
-		err = restore.ChtimesExact(dummyFile, originalBtime, sourceMtime, sourceMtime)
-		require.NoError(t, err)
-	}
-
-	// Verify btime is restored
-	entryBeforeSnap2, err := localfs.NewEntry(dummyFile)
-	require.NoError(t, err)
-	btimeBeforeSnap2 := getBirthTime(entryBeforeSnap2)
-	t.Logf("Before snapshot 2 - btime: %v (btime restored)", btimeBeforeSnap2)
-
-	// Create second snapshot (should capture the proper btime due to migration logic)
+	// Create second snapshot with proper btime (simulates new Kopia with btime support)
 	latestSnapshot := createSnapshot(t, ctx, env.RepositoryWriter, sourceDir)
 	t.Logf("Second snapshot created (new repo, with btime)")
 

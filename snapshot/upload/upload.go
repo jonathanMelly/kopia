@@ -450,7 +450,8 @@ func newDirEntryWithSummary(d fs.Entry, oid object.ID, summ *fs.DirectorySummary
 func setBirthTime(de *snapshot.DirEntry, md fs.Entry) {
 	if ewb, ok := md.(fs.EntryWithBirthTime); ok {
 		if btime := ewb.BirthTime(); !btime.IsZero() {
-			de.BirthTime = fs.UTCTimestampFromTime(btime)
+			btimeVal := fs.UTCTimestampFromTime(btime)
+			de.BirthTime = &btimeVal
 		}
 	}
 }
@@ -512,7 +513,7 @@ func newCachedDirEntry(md, cached fs.Entry, fname string) (*snapshot.DirEntry, e
 	// If the cached entry doesn't have birth time but the current filesystem entry does,
 	// update the DirEntry with the current birth time. This ensures that birth time
 	// is captured for files that existed before birth time support was added.
-	if de.BirthTime == 0 {
+	if de.BirthTime == nil {
 		setBirthTime(de, md)
 	}
 

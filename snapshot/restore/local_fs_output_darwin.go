@@ -30,6 +30,13 @@ func symlinkChtimes(linkPath string, btime, atime, mtime time.Time) error {
 }
 
 func chtimes(path string, btime, atime, mtime time.Time) error {
+	// When btime is not available (zero time from old snapshots without btime support),
+	// just use os.Chtimes to set atime/mtime and leave btime as-is (OS sets to file creation time).
+	if btime.IsZero() {
+		//nolint:wrapcheck
+		return os.Chtimes(path, atime, mtime)
+	}
+
 	return setFileTimes(path, btime, atime, mtime, false)
 }
 
