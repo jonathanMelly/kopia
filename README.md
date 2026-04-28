@@ -1,3 +1,16 @@
+> **This is an unofficial fork of [kopia/kopia](https://github.com/kopia/kopia) adding birth time (file creation time) preservation.**
+> Upstream PR: [kopia/kopia#4994](https://github.com/kopia/kopia/pull/4994) — track it for eventual merge into mainline.
+>
+> **Birth time is off by default** (fully compatible with standard kopia repositories).
+> Enable it per path:
+> ```
+> kopia policy set --preserve-birth-time=true /your/path
+> ```
+> Supported platforms: macOS, Windows, FreeBSD. Linux reads btime where the filesystem exposes it.
+> Download pre-built binaries from [Releases](../../releases).
+
+---
+
 Kopia
 =====
 
