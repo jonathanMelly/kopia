@@ -3,6 +3,14 @@ on:
   workflow_run:
     workflows: ["Build"]
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: "Build workflow run ID to download artifacts from"
+        required: true
+      tag_name:
+        description: "Release tag (e.g. v0.22.3-btime)"
+        required: true
 
 permissions:
   contents: write
@@ -11,16 +19,31 @@ jobs:
   publish:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
-    # Only run on successful btime tag builds in this fork
+    # Auto: binaries are built even when npm audit etc. fail; skip only cancelled runs.
+    # Manual: always run.
     if: |
-      github.event.workflow_run.conclusion == 'success' &&
-      contains(github.event.workflow_run.head_branch, '-btime') &&
-      github.repository != 'kopia/kopia'
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.workflow_run.conclusion != 'cancelled' &&
+        contains(github.event.workflow_run.head_branch, '-btime') &&
+        github.repository != 'kopia/kopia'
+      )
     steps:
+      - name: Resolve run ID and tag
+        id: ctx
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "run_id=${{ inputs.run_id }}" >> "$GITHUB_OUTPUT"
+            echo "tag_name=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_id=${{ github.event.workflow_run.id }}" >> "$GITHUB_OUTPUT"
+            echo "tag_name=${{ github.event.workflow_run.head_branch }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Download artifacts from Build run
         uses: actions/download-artifact@v4
         with:
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ steps.ctx.outputs.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           pattern: kopia-*
           merge-multiple: true
@@ -32,12 +55,12 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.event.workflow_run.head_branch }}
-          name: ${{ github.event.workflow_run.head_branch }}
+          tag_name: ${{ steps.ctx.outputs.tag_name }}
+          name: ${{ steps.ctx.outputs.tag_name }}
           body: |
             Kopia btime fork — birth time (file creation time) preservation.
 
-            Based on upstream kopia ${{ github.event.workflow_run.head_branch }}.
+            Based on upstream kopia ${{ steps.ctx.outputs.tag_name }}.
 
             **Enable birth time preservation:**
             ```
