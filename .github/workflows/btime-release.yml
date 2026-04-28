@@ -13,8 +13,20 @@ permissions:
   contents: write
 
 jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Run btime-related tests
+        run: go test ./snapshot/upload/... ./snapshot/restore/... ./snapshot/policy/... ./fs/...
+
   build:
     name: Build ${{ matrix.goos }}/${{ matrix.goarch }}
+    needs: test
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -36,6 +48,15 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Resolve tag
+        id: ctx
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "tag_name=${{ inputs.tag_name }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag_name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build
         env:
           GOOS: ${{ matrix.goos }}
@@ -44,7 +65,9 @@ jobs:
         run: |
           EXT=""
           [[ "${{ matrix.goos }}" == "windows" ]] && EXT=".exe"
-          go build -ldflags="-s -w" -o "kopia-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}" .
+          go build \
+            -ldflags="-s -w -X github.com/kopia/kopia/repo.BuildVersion=${{ steps.ctx.outputs.tag_name }}" \
+            -o "kopia-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}" .
 
       - name: Package
         run: |
@@ -76,6 +99,7 @@ jobs:
             echo "tag_name=${{ github.ref_name }}" >> "$GITHUB_OUTPUT"
           fi
 
+
       - uses: actions/download-artifact@v4
         with:
           pattern: kopia-*
@@ -100,6 +124,13 @@ jobs:
             kopia policy set --preserve-birth-time=true <path>
             ```
             Default is off — fully compatible with standard kopia repositories.
+
+            **Verify the feature is present:**
+            ```
+            kopia policy set --help | grep birth
+            # expected: --preserve-birth-time=...
+            ```
+            `kopia --version` will report `${{ steps.ctx.outputs.tag_name }}`.
 
             **KopiaUI users:** download the binary for your platform, then in KopiaUI go to
             _File → Advanced → Override Kopia executable_ and point it to this binary.

@@ -8,6 +8,12 @@
 > ```
 > Supported platforms: macOS, Windows, FreeBSD. Linux reads btime where the filesystem exposes it.
 >
+> **Verify the feature is present** after downloading:
+> ```
+> kopia policy set --help | grep birth
+> # expected: --preserve-birth-time=...
+> ```
+>
 > **CLI users:** download the binary for your platform from [Releases](../../releases).
 >
 > **KopiaUI users:** download the binary, then go to _File → Advanced → Override Kopia executable_ and point it to this binary. Use the CLI once to set the policy, then KopiaUI works as usual.
