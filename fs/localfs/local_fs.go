@@ -24,13 +24,13 @@ type Options struct {
 var DefaultOptions = &Options{}
 
 type filesystemEntry struct {
-	name        string
-	size        int64
-	mtimeNanos  int64
-	btimeNanos  int64
-	mode        os.FileMode
-	owner       fs.OwnerInfo
-	device      fs.DeviceInfo
+	name       string
+	size       int64
+	mtimeNanos int64
+	btimeNanos int64
+	mode       os.FileMode
+	owner      fs.OwnerInfo
+	device     fs.DeviceInfo
 
 	prefix  string
 	options *Options
