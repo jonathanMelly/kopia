@@ -1,0 +1,50 @@
+name: Btime Release
+on:
+  workflow_run:
+    workflows: ["Build"]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    # Only run on successful btime tag builds in this fork
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      contains(github.event.workflow_run.head_branch, '-btime') &&
+      github.repository != 'kopia/kopia'
+    steps:
+      - name: Download artifacts from Build run
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          pattern: kopia-*
+          merge-multiple: true
+          path: dist
+
+      - name: List artifacts
+        run: ls -lR dist/
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.workflow_run.head_branch }}
+          name: ${{ github.event.workflow_run.head_branch }}
+          body: |
+            Kopia btime fork — birth time (file creation time) preservation.
+
+            Based on upstream kopia ${{ github.event.workflow_run.head_branch }}.
+
+            **Enable birth time preservation:**
+            ```
+            kopia policy set --preserve-birth-time=true <path>
+            ```
+            Default is off — fully compatible with standard kopia repositories.
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+          fail_on_unmatched_files: false
