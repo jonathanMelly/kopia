@@ -32,11 +32,6 @@ fi
 
 BTIME_TAG="${UPSTREAM_TAG}-btime"
 
-if git rev-parse "$BTIME_TAG" >/dev/null 2>&1; then
-  echo "Tag $BTIME_TAG already exists -- nothing to do."
-  exit 0
-fi
-
 # Step 1: sync btime-proposal onto upstream/master (keeps PR up to date)
 echo "Syncing $PR_BRANCH onto $UPSTREAM_REMOTE/master..."
 git checkout "$PR_BRANCH"
@@ -50,6 +45,11 @@ git rebase "$PR_BRANCH"
 git push "$ORIGIN_REMOTE" "$FORK_BRANCH" --force-with-lease
 
 # Step 3: build release tag on the exact upstream tag, not master.
+if git rev-parse "$BTIME_TAG" >/dev/null 2>&1; then
+  echo "Tag $BTIME_TAG already exists — branches synced, no new release needed."
+  exit 0
+fi
+
 # Cherry-pick all commits unique to btime-fork (btime + infra) onto vX.Y.Z
 # so CI sees the same npm/Go base as the official release.
 echo "Building release tag $BTIME_TAG on top of $UPSTREAM_TAG..."
